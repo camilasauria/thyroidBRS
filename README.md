@@ -41,7 +41,8 @@ the difference between its normalized Euclidean distance to the two centroids:
 BRS(t) = ||v(t) - c(B)||₂ - ||v(t) - c(R)||₂
 ```
 
-Negative is BRAF<sup>V600E</sup>-like, positive is RAS-like. `predict()` returns both
+Negative is BRAF<sup>V600E</sup>-like, positive is RAS-like (`brs_class` spells
+the two classes `"Braf-like"` and `"Ras-like"`). `predict()` returns both
 this value (`brs_score`) and the version rescaled to [-1, +1] across the
 scored samples (`brs_scaled`), which is the axis the published figures use.
 The rescaling is a property of the *set* being scored, not of a sample on its
@@ -69,6 +70,8 @@ remotes::install_github("camilasauria/thyroidBRS")
 ```r
 library(thyroidBRS)
 
+# `expr` and `labels` stand for your own data; the vignette builds a small
+# simulated pair that runs as is.
 # expr:   log2(TPM + 1) expression matrix, gene symbols x samples
 # labels: named character vector of DRIVER MUTATION status, for the subset of
 #         samples that have it — "BRAF_V600E" / "RAS"
@@ -129,18 +132,21 @@ being. Treat it as an upper bound.
 The 96.4% is the cleanest number here. Those 111 tumors are neither
 BRAF-V600E- nor RAS-mutant, so they entered neither the signature derivation
 nor the centroid fit — 58 carry a fusion driver, 10 another driver mutation,
-and 43 no identified driver at all. All 111 were exome sequenced; the 94
-tumors in the cohort that never were have no published BRS and are not in
-this set. It still measures agreement with the original classifier rather
-than with a biological truth.
+and 43 no identified driver at all. All 111 were exome sequenced. (Of the
+114 scored tumors without a published BRS, 94 were never exome sequenced, 9
+were but received no score, and 11 are not in the clinical table at all;
+none of them is in this set.) It still measures agreement with the original
+classifier rather than with a biological truth.
 
 Concordance on the samples that *defined* the centroids is resubstitution and
-carries a large optimistic bias: at these dimensions, pure noise with no signal
+carries a large optimistic bias: at the dimensions of the published
+comparison (70 genes, 391 samples split 272/119), pure noise with no signal
 at all still resubstitutes at about 68%. `validate_brs()` reports how much of
 any comparison is resubstitution, and warns when all of it is.
 
 A genuinely independent estimate needs a cohort that played no part in
-deriving the signature. See `data-raw/microarray_notes.md`.
+deriving the signature. See
+[`data-raw/microarray_notes.md`](https://github.com/camilasauria/thyroidBRS/blob/main/data-raw/microarray_notes.md).
 
 [^1]: `brs_scaled` is rescaled across whatever set is being scored, and the
     published values were rescaled across the 391 tumors that had one. The
@@ -151,7 +157,8 @@ deriving the signature. See `data-raw/microarray_notes.md`.
     gives 0.986 either way — but that is a property of this cohort, not a
     guarantee. Rescale over the shared subset before comparing elsewhere.
 
-Reproduce with `data-raw/validate_tcga.R`.
+Reproduce with
+[`data-raw/validate_tcga.R`](https://github.com/camilasauria/thyroidBRS/blob/main/data-raw/validate_tcga.R).
 
 ## Gene list
 
@@ -169,10 +176,12 @@ Four checks back the transcription:
   figure (`ARNTL` → `BMAL1`, `PVRL4` → `NECTIN4`, `FAM176A` → `EVA1A`,
   `TM7SF4` → `DCSTAMP`) and `FLJ23867` maps to nothing in current annotation,
   so the classifier uses 70 genes.
-- Re-running the derivation itself (`data-raw/derive_signature.R`) puts the
+- Re-running the derivation itself
+  ([`data-raw/derive_signature.R`](https://github.com/camilasauria/thyroidBRS/blob/main/data-raw/derive_signature.R))
+  puts the
   published genes at the top of the ranking: over 200 limma-voom iterations
   only ~260 genes ever reach a top 100, and 68 of the 70 usable published
-  genes are among them, at a median selection frequency of 92-97%. On a
+  genes are among them, at a median selection frequency of 93-97%. On a
   2014-like gene universe the paper's strict criterion keeps 27 genes, 26 of
   them published.
 
@@ -182,22 +191,30 @@ uses, so GENCODE v36 matrices (`ARNTL`, `PVRL4`) and current ones (`BMAL1`,
 
 What the re-derivation does *not* reproduce is the count of exactly 71, which
 depends on choices the paper leaves unspecified. See
-`data-raw/signature_rederivation.md` for the full comparison, and
-`data-raw/brs_genes.md` for the provenance of the list.
+[`data-raw/signature_rederivation.md`](https://github.com/camilasauria/thyroidBRS/blob/main/data-raw/signature_rederivation.md)
+for the full comparison, and
+[`data-raw/brs_genes.md`](https://github.com/camilasauria/thyroidBRS/blob/main/data-raw/brs_genes.md)
+for the provenance of the list.
 
 ## Provenance
 
-Substantial parts of this package were written by **Claude Opus 5**
-(Anthropic), working from the published description of the method and under
-the direction of the authors, who reviewed the work and are responsible for
-its correctness and maintenance.
+Substantial parts of this package were written by Claude models (Anthropic),
+working from the published description of the method and under the direction
+of the authors, who reviewed the work and are responsible for its correctness
+and maintenance: the first version was drafted with **Claude Sonnet 5**, the
+audit and the preparation for Bioconductor with **Claude Opus 5**, and the
+changes from the Bioconductor review with **Claude Fable 5.1**.
 
 Concretely, of the code in this repository: `R/containers.R` and everything
-under `data-raw/` were written by the model; `R/brs.R` grew from 275 to 755
-lines and its original content was rewritten; the test suite grew from 87 to
-573 lines; the vignette and README were largely rewritten. Nine of the ten
-commits carry `Co-Authored-By: Claude Opus 5`, so the attribution is visible
-per-commit in the git history and can be checked with `git log`.
+under `data-raw/` were written by the model; `R/brs.R` and the test suite
+were rewritten from a much smaller first version, and so were the vignette
+and this README. Every commit with model-written code carries a
+`Co-Authored-By: Claude ...` trailer, so the attribution is visible per commit
+and can be checked with
+
+```sh
+git log --format=%b | grep Co-Authored-By | sort | uniq -c
+```
 
 The work is the audit described in `NEWS.md`: the classifier's reference
 groups, score formula and eight silent failure modes were corrected against
@@ -209,7 +226,7 @@ No code was copied from another software project. Under Anthropic's terms the
 authors own the output, so the contributed code is redistributable under this
 package's MIT licence.
 
-Assisted-by: Claude Opus 5 (Anthropic)
+Assisted-by: Claude Sonnet 5, Claude Opus 5 and Claude Fable 5.1 (Anthropic)
 
 ## License
 

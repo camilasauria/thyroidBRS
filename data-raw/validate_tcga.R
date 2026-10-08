@@ -6,24 +6,17 @@
 ## are only ever used to check the result. Fitting on the published class
 ## instead is circular — it is the sign of the published score.
 ##
-##   Rscript data-raw/validate_tcga.R
+##   THCA_LOG2TPM=<thca_log2tpm.rds> Rscript data-raw/validate_tcga.R
 ##
-## Expects a log2(TPM + 1) matrix of TCGA-THCA primary tumors, gene symbols as
-## row names and patient barcodes (TCGA-XX-XXXX) as column names. Build it
-## from the GDC "STAR - Counts" files, e.g.
-##
-##   library(TCGAbiolinks)
-##   q <- GDCquery(project = "TCGA-THCA",
-##                 data.category = "Transcriptome Profiling",
-##                 data.type = "Gene Expression Quantification",
-##                 workflow.type = "STAR - Counts")
-##   GDCdownload(q)
-##   se <- GDCprepare(q)
-##   # keep assay "tpm_unstranded", primary tumors (-01), collapse duplicated
-##   # symbols, then log2(x + 1).
+## THCA_LOG2TPM is the log2(TPM + 1) matrix that data-raw/build_inputs.R
+## writes: TCGA-THCA primary tumors, gene symbols as row names, patient
+## barcodes (TCGA-XX-XXXX) as column names. Build it with that script rather
+## than by hand: how duplicated symbols are collapsed and which aliquot is
+## kept per patient both move the figures below, and build_inputs.R is where
+## those decisions are written down.
 
-## Assisted-by: Claude Opus 5 (Anthropic). See the Provenance section
-## of README.md.
+## Assisted-by: Claude Opus 5 and Claude Fable 5.1 (Anthropic). See the
+## Provenance section of README.md.
 
 library(thyroidBRS)
 
@@ -79,13 +72,12 @@ print(table(published = pub$published_class, predicted = preds[i, "brs_class"]))
 ## ---- cross-validate on the reference set ------------------------------
 set.seed(1)
 fold <- sample(rep(seq_len(10), length.out = length(mut)))
-cv <- character(length(mut))
-names(cv) <- names(mut)
-for (k in seq_len(10)) {
+cv_fold <- function(k) {
     f <- brs_fit(expr, mut[fold != k])
     in_fold <- names(mut)[fold == k]
-    cv[in_fold] <- predict(f, expr[, in_fold, drop = FALSE])$brs_class
+    setNames(predict(f, expr[, in_fold, drop = FALSE])$brs_class, in_fold)
 }
+cv <- unlist(lapply(seq_len(10), cv_fold))[names(mut)]
 truth <- ifelse(mut == "BRAF_V600E", "Braf-like", "Ras-like")
 cat("\n10-fold CV against mutation status (n = ", length(mut), "): ",
     round(100 * mean(cv == truth), 1), "%\n", sep = "")

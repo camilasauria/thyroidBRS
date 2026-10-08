@@ -24,8 +24,8 @@
 ## Following an earlier version of this header, which described a different
 ## structure, left `groups` NULL and the script failed on the first draw.
 
-## Assisted-by: Claude Opus 5 (Anthropic). See the Provenance section
-## of README.md.
+## Assisted-by: Claude Opus 5 and Claude Fable 5.1 (Anthropic). See the
+## Provenance section of README.md.
 
 suppressPackageStartupMessages({
     library(edgeR)
@@ -93,17 +93,43 @@ run <- function(n_per_group, label) {
             " vs ", n_per_group)
     hits <- mclapply(seq_len(N_ITER), one_iteration,
                      n_per_group = n_per_group, mc.cores = N_CORES)
+    ## A worker that fails returns a try-error, which unlist() would count as
+    ## a gene name; stop instead of carrying it into the table.
+    failed <- vapply(hits, inherits, logical(1), what = "try-error")
+    if (any(failed)) {
+        stop(sum(failed), " of ", N_ITER, " iterations failed; first error: ",
+             conditionMessage(attr(hits[[which(failed)[1]]], "condition")))
+    }
     freq <- sort(table(unlist(hits)), decreasing = TRUE) / N_ITER
 
     ## "consistently ranked at each iteration among the most significant 100"
     always <- names(freq)[freq == 1]
     message("  genes in the top ", TOP_N, " at EVERY iteration: ",
             length(always))
-    for (cut in c(0.99, 0.95, 0.90, 0.75, 0.50)) {
-        message("  at >= ", 100 * cut, "% of iterations: ",
-                sum(freq >= cut))
-    }
+    cuts <- c(0.99, 0.95, 0.90, 0.75, 0.50)
+    message(paste0("  at >= ", 100 * cuts, "% of iterations: ",
+                   vapply(cuts, function(cut) sum(freq >= cut), integer(1)),
+                   collapse = "\n"))
     list(freq = freq, always = always, hits = hits)
+}
+
+## How the published genes sit in the consistency ranking: how many genes
+## ever reach a top 100, how many published ones are among them, and the
+## median selection frequency over the usable published genes, counting the
+## ones that never appear as 0. These are the figures quoted in
+## signature_rederivation.md.
+consistency_summary <- function(freq, published) {
+    ## "Usable" means present in the matrix: FLJ23867 is in the published
+    ## list but in no current annotation, so it cannot be selected at all.
+    published <- published[published %in% rownames(counts)]
+    f <- setNames(as.numeric(freq[published]), published)
+    f[is.na(f)] <- 0
+    message("\n  genes ever in a top ", TOP_N, ": ", length(freq))
+    message("  usable published genes among them: ", sum(f > 0), " of ",
+            length(published))
+    message("  median selection frequency over the ", length(published),
+            " usable published genes: ", round(100 * median(f), 1), "%")
+    invisible(f)
 }
 
 ## If we simply take the N most consistent genes, how many are the published
@@ -122,16 +148,17 @@ top_n_overlap <- function(freq, published, n = length(published)) {
 ## 10 draws than over 200. Show the whole curve.
 iteration_curve <- function(hits, published) {
     message("\n  iterations -> genes kept at 100% (of which published)")
-    for (k in c(5, 10, 20, 50, 100, length(hits))) {
-        if (k > length(hits)) next
+    ks <- c(5, 10, 20, 50, 100, length(hits))
+    ks <- ks[ks <= length(hits)]
+    lines <- vapply(ks, function(k) {
         tab <- table(unlist(hits[seq_len(k)]))
         kept <- names(tab)[tab == k]
-        message("    ", formatC(k, width = 4), " -> ",
-                formatC(length(kept), width = 4), "  (",
-                length(intersect(kept, published)), " published, ",
-                round(100 * length(intersect(kept, published)) /
-                      max(1, length(kept))), "% precision)")
-    }
+        n_pub <- length(intersect(kept, published))
+        paste0("    ", formatC(k, width = 4), " -> ",
+               formatC(length(kept), width = 4), "  (", n_pub, " published, ",
+               round(100 * n_pub / max(1, length(kept))), "% precision)")
+    }, character(1))
+    message(paste(lines, collapse = "\n"))
 }
 
 ## The published signature, spelled the way this matrix spells it.
@@ -158,6 +185,7 @@ compare <- function(derived, label) {
 
 main <- run(min(length(braf), length(ras)), "equal-size sets (all RAS)")
 compare(main$always, "Top-100-always")
+consistency_summary(main$freq, published)
 iteration_curve(main$hits, published)
 extra71 <- top_n_overlap(main$freq, published)
 message("  not published: ", paste(head(extra71, 25), collapse = ", "))

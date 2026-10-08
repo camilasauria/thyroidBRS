@@ -50,7 +50,7 @@ it from the publisher or from PMC if you want to re-check the transcription.
    Procedures 14.1 was re-run on TCGA-THCA — see `derive_signature.R` and
    `signature_rederivation.md`. Across 200 iterations only ~260 of 16,000-23,000
    genes ever reach a top 100, and 68 of the 70 usable published genes are
-   among them at a median selection frequency of 92-97%. On a 2014-like
+   among them at a median selection frequency of 93-97%. On a 2014-like
    protein-coding universe the strict criterion keeps 27 genes of which 26 are
    published, and the one exception was not an annotated gene in 2014.
 

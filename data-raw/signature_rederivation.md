@@ -28,9 +28,11 @@ full universe and a protein-coding-restricted one.
 
 Across 200 iterations only **262 of the 23,339 genes** ever enter a top 100,
 and **68 of the 70 usable published genes are among them** — all within the
-top 200 of the consistency ranking, at a median selection frequency of 92.5%.
-On the coding universe the same holds with 257 genes and a median frequency
-of 97%.
+top 200 of the consistency ranking. The median selection frequency over the
+70 usable published genes, counting the two that never appear as 0, is
+93.5%. On the coding universe the same holds with 257 genes and a median
+frequency of 97.2%. (`derive_signature.R` prints these three figures after
+the "Top-100-always" comparison.)
 
 Taking the 71 most consistent genes:
 
@@ -123,8 +125,11 @@ list in `brs_genes` remains the published one.
 
 ```sh
 # derive_input.rds holds list(counts, keep, coding, grp); see the script header
-THCA_COUNTS=derive_input.rds BRS_UNIVERSE=coding BRS_ITER=200 BRS_CORES=10 \
-    Rscript data-raw/derive_signature.R
+THCA_COUNTS=derive_input.rds BRS_CORES=15 BRS_OUT=derive_all.rds \
+    Rscript data-raw/derive_signature.R                      # whole universe
+THCA_COUNTS=derive_input.rds BRS_CORES=15 BRS_OUT=derive_coding.rds \
+    BRS_UNIVERSE=coding Rscript data-raw/derive_signature.R  # coding universe
 ```
 
-Runtime is about four minutes per design on ten cores.
+Name the output with `BRS_OUT`: both runs default to the same file. Each run
+(200 iterations, both designs) takes about two minutes on 15 cores.

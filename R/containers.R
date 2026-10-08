@@ -2,7 +2,7 @@
 # (Anthropic) working from the published description of the method, under the
 # direction of and reviewed by the package authors, who are responsible for
 # its correctness and maintenance. See the Provenance section of README.md.
-# Assisted-by: Claude Opus 5 (Anthropic)
+# Assisted-by: Claude Opus 5 and Claude Fable 5.1 (Anthropic)
 
 #' Expression container support
 #'
@@ -65,24 +65,10 @@ NULL
     }
 
     if (methods::is(x, "SummarizedExperiment")) {
-        assays <- SummarizedExperiment::assayNames(x)
-        if (is.null(assay)) {
-            assay <- if (length(assays)) assays[1L] else 1L
-            if (length(assays) > 1L) {
-                warning("`", arg, "` has ", length(assays),
-                    " assays and none was chosen; using \"", assay,
-                    "\". Pass `assay=` to pick another (",
-                    .truncate(assays, 6L), ").",
-                    call. = FALSE
-                )
-            }
-        } else if (is.character(assay) && !assay %in% assays) {
-            stop("No assay named \"", assay, "\" in `", arg, "`; available: ",
-                .truncate(assays, 10L),
-                call. = FALSE
-            )
-        }
-        m <- SummarizedExperiment::assay(x, assay)
+        # Resolved before the call: evaluated as an argument of the S4
+        # generic, an error here would come back wrapped in the dispatch.
+        i <- .pick_assay(x, assay, arg)
+        m <- SummarizedExperiment::assay(x, i)
         return(.finish_matrix(m, rownames(x), colnames(x), arg))
     }
 
@@ -99,6 +85,44 @@ NULL
         "ExpressionSet; got ", class(x)[1L], ".",
         call. = FALSE
     )
+}
+
+# Which assay of a SummarizedExperiment to use: the one asked for, checked
+# to exist, or the first one with a warning when there was a choice to make.
+.pick_assay <- function(x, assay, arg) {
+    assays <- SummarizedExperiment::assayNames(x)
+    n_assays <- length(SummarizedExperiment::assays(x))
+    if (n_assays == 0L) {
+        stop("`", arg, "` has no assays.", call. = FALSE)
+    }
+    if (!is.null(assay) && (length(assay) != 1L || is.na(assay) ||
+        !(is.character(assay) || is.numeric(assay)))) {
+        stop("`assay` must be a single assay name or index.", call. = FALSE)
+    }
+    if (is.null(assay)) {
+        assay <- if (length(assays)) assays[1L] else 1L
+        if (length(assays) > 1L) {
+            warning("`", arg, "` has ", length(assays),
+                " assays and none was chosen; using \"", assay,
+                "\". Pass `assay=` to pick another (",
+                .truncate(assays, 6L), ").",
+                call. = FALSE
+            )
+        }
+    } else if (is.character(assay) && !assay %in% assays) {
+        stop("No assay named \"", assay, "\" in `", arg, "`; available: ",
+            .truncate(assays, 10L),
+            call. = FALSE
+        )
+    } else if (is.numeric(assay)) {
+        if (assay < 1L || assay > n_assays || assay != round(assay)) {
+            stop("`assay` must name or index one of the ", n_assays,
+                " assay(s) of `", arg, "`.",
+                call. = FALSE
+            )
+        }
+    }
+    assay
 }
 
 .finish_matrix <- function(m, rn, cn, arg) {

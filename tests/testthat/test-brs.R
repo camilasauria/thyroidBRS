@@ -46,10 +46,8 @@ test_that("brs_genes records the two blocks of Figure S7A", {
     # transcription lost no gene and reordered none. Compared against a radix
     # sort, which orders in the C locale on every platform — is.unsorted()
     # would compare in whatever collation the session happens to run under.
-    for (b in c(1L, 2L)) {
-        sym <- brs_genes$original_symbol[brs_genes$block == b]
-        expect_identical(sym, sort(sym, method = "radix"))
-    }
+    by_block <- split(brs_genes$original_symbol, brs_genes$block)
+    expect_identical(by_block, lapply(by_block, sort, method = "radix"))
 })
 
 test_that("stale symbols are resolved, ARNTL included", {
@@ -140,7 +138,7 @@ test_that("the score matches closed-form values at known positions", {
 test_that("unrecognised label values warn instead of vanishing", {
     cohort <- make_synthetic_cohort()
     labels <- cohort$labels
-    labels[1:5] <- "OTHER"
+    labels[seq_len(5)] <- "OTHER"
 
     expect_warning(
         fit <- brs_fit(cohort$expr, labels, genes = rownames(cohort$expr)),
@@ -203,7 +201,7 @@ test_that("validate_brs() rejects something that is not a predictions frame", {
 
 test_that("validate_brs() separates resubstitution from real validation", {
     cohort <- make_synthetic_cohort()
-    in_fit <- names(cohort$labels)[c(1:10, 31:40)]
+    in_fit <- names(cohort$labels)[c(seq_len(10), seq(31, 40))]
     fit <- brs_fit(cohort$expr, cohort$labels[in_fit],
         genes = rownames(cohort$expr)
     )
@@ -289,7 +287,7 @@ test_that("predict.brs_fit errors clearly when newdata is missing a gene", {
     fit <- brs_fit(cohort$expr, cohort$labels, genes = rownames(cohort$expr))
 
     incomplete <- cohort$expr[-1, , drop = FALSE]
-    expect_error(predict(fit, incomplete), "missing")
+    expect_error(predict(fit, incomplete), "missing 1 signature gene")
 })
 
 test_that("zero-variance genes in the reference are dropped, not fatal", {
@@ -431,11 +429,12 @@ test_that("the class boundary puts zero on the Ras-like side", {
 })
 
 test_that("the signature resolves against either annotation vintage", {
-    lab <- setNames(rep(c("BRAF_V600E", "RAS"), each = 20), paste0("S", 1:40))
+    lab <- setNames(rep(c("BRAF_V600E", "RAS"), each = 20),
+                    paste0("S", seq_len(40)))
     mk <- function(rn) {
         set.seed(3)
         matrix(rnorm(length(rn) * 40, 5), length(rn), 40,
-            dimnames = list(rn, paste0("S", 1:40))
+            dimnames = list(rn, paste0("S", seq_len(40)))
         )
     }
     modern <- na.omit(brs_genes$current_symbol) # BMAL1, NECTIN4
@@ -536,15 +535,16 @@ test_that("standardize defaults to reference and is unchanged", {
 
     expect_equal(predict(fit, cohort$expr),
                  predict(fit, cohort$expr, standardize = "reference"))
-    expect_error(predict(fit, cohort$expr, standardize = "nope"))
+    expect_error(predict(fit, cohort$expr, standardize = "nope"),
+                 "should be one of")
 })
 
 # A cohort whose two blocks move in opposite directions, as the real
 # signature does: 10 genes up in BRAF, 10 up in RAS.
 make_two_block_cohort <- function(seed = 4) {
     set.seed(seed)
-    genes <- paste0("GENE", 1:20)
-    samples <- paste0("S", 1:60)
+    genes <- paste0("GENE", seq_len(20))
+    samples <- paste0("S", seq_len(60))
     cls <- rep(c("BRAF_V600E", "RAS"), each = 30)
     shift <- rep(c(-1, 1), each = 10)
 
@@ -581,7 +581,7 @@ test_that("rank standardization discards a signature-wide shift", {
 test_that("cohort and rank refuse to score a handful of samples", {
     cohort <- make_synthetic_cohort()
     fit <- brs_fit(cohort$expr, cohort$labels, genes = rownames(cohort$expr))
-    two <- cohort$expr[, 1:2, drop = FALSE]
+    two <- cohort$expr[, seq_len(2), drop = FALSE]
 
     expect_error(predict(fit, two, standardize = "cohort"), "at least 3")
     expect_error(predict(fit, two, standardize = "rank"), "at least 3")
@@ -598,7 +598,7 @@ test_that("reference scoring does not depend on the rest of the cohort", {
     expect_equal(alone, within$brs_score[within$sample == one])
 
     # Under "cohort" it does depend on it — that is the trade-off.
-    a <- predict(fit, cohort$expr[, 61:70], standardize = "cohort")
+    a <- predict(fit, cohort$expr[, seq(61, 70)], standardize = "cohort")
     b <- predict(fit, cohort$expr, standardize = "cohort")
     expect_false(isTRUE(all.equal(
         a$brs_score[a$sample == one],
@@ -642,7 +642,7 @@ test_that("expression on the wrong scale is flagged", {
 test_that("labels that do not match colnames are reported", {
     cohort <- make_synthetic_cohort()
     bad <- cohort$labels
-    scrambled <- c(1:25, 31:55)
+    scrambled <- c(seq_len(25), seq(31, 55))
     names(bad)[scrambled] <- paste0(names(bad)[scrambled], "-01A")
 
     expect_warning(brs_fit(cohort$expr, bad, genes = rownames(cohort$expr)),
@@ -666,7 +666,7 @@ test_that("predict resolves the other symbol spelling", {
     set.seed(2)
     v36 <- brs_genes$original_symbol[!is.na(brs_genes$current_symbol)]
     modern <- na.omit(brs_genes$current_symbol)
-    samples <- paste0("S", 1:40)
+    samples <- paste0("S", seq_len(40))
     labels <- setNames(rep(c("BRAF_V600E", "RAS"), each = 20), samples)
     mk <- function(rn) {
         matrix(rnorm(length(rn) * 40, 5), length(rn), 40,
@@ -710,4 +710,175 @@ test_that("NA in the requested gene set is ignored, not reported missing", {
     genes <- c(rownames(cohort$expr), NA_character_)
     fit <- brs_fit(cohort$expr, cohort$labels, genes = genes)
     expect_length(fit$genes_missing, 0L)
+})
+
+## ---- branches a package review found untested -----------------------------
+
+test_that("brs_score does not warn about `assay` when newdata is a matrix", {
+    skip_if_not_installed("SummarizedExperiment")
+    cohort <- make_synthetic_cohort()
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = 2^cohort$expr - 1, logtpm = cohort$expr)
+    )
+    # `assay` picks the assay of `expr`; passing it on to predict() for a
+    # plain matrix used to produce a false "assay is ignored" warning.
+    expect_no_warning(
+        brs_score(se, cohort$labels, newdata = cohort$expr,
+                  genes = rownames(cohort$expr), assay = "logtpm")
+    )
+    # ...and the mirror image: a matrix to fit on, a container to score.
+    expect_no_warning(
+        brs_score(cohort$expr, cohort$labels, newdata = se,
+                  genes = rownames(cohort$expr), assay = "logtpm")
+    )
+})
+
+test_that("standardize = 'rank' with a single gene fails with a clear error", {
+    cohort <- make_synthetic_cohort()
+    one <- brs_fit(cohort$expr, cohort$labels, genes = "GENE1")
+    # One gene has rank 1 in every sample, so nothing varies. Used to crash
+    # in `dimnames<-` because apply() had dropped to a vector.
+    expect_error(
+        suppressWarnings(predict(one, cohort$expr, standardize = "rank")),
+        "No signature gene varies"
+    )
+})
+
+test_that("predict.brs_fit refuses an object that is not a brs_fit", {
+    cohort <- make_synthetic_cohort()
+    expect_error(predict.brs_fit(list(), cohort$expr), "brs_fit")
+})
+
+test_that("duplicated rows are caught under the other symbol spelling", {
+    set.seed(3)
+    genes <- na.omit(brs_genes$current_symbol)
+    samples <- paste0("S", seq_len(12))
+    expr <- matrix(rnorm(length(genes) * 12), nrow = length(genes),
+                   dimnames = list(genes, samples))
+    labels <- setNames(rep(c("BRAF_V600E", "RAS"), each = 6), samples)
+    fit <- brs_fit(expr, labels)
+    expect_true("BMAL1" %in% fit$genes_used)
+
+    # newdata spells the gene ARNTL, twice.
+    nd <- expr
+    rownames(nd)[rownames(nd) == "BMAL1"] <- "ARNTL"
+    nd <- rbind(nd, ARNTL = 0)
+    expect_warning(
+        suppressMessages(predict(fit, nd)),
+        "Duplicated row names"
+    )
+})
+
+test_that("log2_transform = TRUE on a matrix with negatives is an error", {
+    cohort <- make_synthetic_cohort()
+    expect_error(
+        brs_fit(cohort$expr - 10, cohort$labels,
+                genes = rownames(cohort$expr), log2_transform = TRUE),
+        "negative values"
+    )
+})
+
+test_that("labels can name a pData() column of an ExpressionSet", {
+    skip_if_not_installed("Biobase")
+    cohort <- make_synthetic_cohort()
+    driver <- rep(NA_character_, ncol(cohort$expr))
+    names(driver) <- colnames(cohort$expr)
+    driver[names(cohort$labels)] <- cohort$labels
+    es <- Biobase::ExpressionSet(
+        assayData = cohort$expr,
+        phenoData = Biobase::AnnotatedDataFrame(
+            data.frame(driver = driver, row.names = colnames(cohort$expr))
+        )
+    )
+    fit <- brs_fit(es, "driver", genes = rownames(cohort$expr))
+    ref <- brs_fit(cohort$expr, cohort$labels, genes = rownames(cohort$expr))
+    expect_equal(fit$centroid_braf, ref$centroid_braf)
+    expect_equal(fit$n_braf, ref$n_braf)
+})
+
+test_that("print() lists the genes that were dropped", {
+    cohort <- make_synthetic_cohort()
+    expr <- cohort$expr
+    expr["GENE2", names(cohort$labels)[1]] <- NA
+    fit <- suppressWarnings(
+        brs_fit(expr, cohort$labels, genes = c(rownames(expr), "NOPE"))
+    )
+    expect_output(print(fit), "NOPE")
+    expect_output(print(fit), "GENE2")
+})
+
+test_that("validate_brs drops unscored samples, errors when none remain", {
+    cohort <- make_synthetic_cohort()
+    preds <- brs_score(cohort$expr, cohort$labels,
+                       genes = rownames(cohort$expr))
+    preds$brs_class[1] <- NA
+    expect_warning(validate_brs(preds, cohort$labels), "no predicted class")
+    preds$brs_class[] <- NA
+    expect_error(
+        suppressWarnings(validate_brs(preds, cohort$labels)),
+        "No samples left"
+    )
+})
+
+test_that("input checks reject non-numeric or unnamed matrices and bad flags", {
+    cohort <- make_synthetic_cohort()
+    chr <- cohort$expr
+    storage.mode(chr) <- "character"
+    expect_error(brs_fit(chr, cohort$labels), "numeric matrix")
+    bare <- unname(cohort$expr)
+    expect_error(brs_fit(bare, cohort$labels), "rownames")
+    expect_error(
+        brs_fit(cohort$expr, cohort$labels, log2_transform = "yes"),
+        "TRUE or FALSE"
+    )
+})
+
+test_that("a matrix with no signature gene at all is an error", {
+    cohort <- make_synthetic_cohort()
+    expect_error(brs_fit(cohort$expr, cohort$labels), "gene symbols")
+})
+
+test_that("brs_scaled spans only one side when every score has that sign", {
+    cohort <- make_synthetic_cohort()
+    fit <- brs_fit(cohort$expr, cohort$labels, genes = rownames(cohort$expr))
+    braf_only <- cohort$expr[, cohort$true_class == "Braf-like"]
+    preds <- suppressWarnings(predict(fit, braf_only))
+    expect_true(all(preds$brs_scaled <= 0))
+    expect_equal(min(preds$brs_scaled), -1)
+    expect_false(any(preds$brs_scaled == 1))
+})
+
+test_that("a numeric assay index out of range is a package error", {
+    skip_if_not_installed("SummarizedExperiment")
+    cohort <- make_synthetic_cohort()
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(logtpm = cohort$expr)
+    )
+    expect_error(
+        brs_fit(se, cohort$labels, genes = rownames(cohort$expr), assay = 2),
+        "must name or index"
+    )
+    expect_error(
+        brs_fit(se, cohort$labels, genes = rownames(cohort$expr),
+                assay = c("a", "b")),
+        "single assay name or index"
+    )
+})
+
+test_that("duplicated sample names in labels are an error", {
+    cohort <- make_synthetic_cohort()
+    bad <- cohort$labels
+    names(bad)[2] <- names(bad)[1]
+    expect_error(
+        brs_fit(cohort$expr, bad, genes = rownames(cohort$expr)),
+        "duplicated sample names"
+    )
+})
+
+test_that("the one-sided warning fires on the RAS side too", {
+    cohort <- make_synthetic_cohort()
+    fit <- brs_fit(cohort$expr, cohort$labels, genes = rownames(cohort$expr))
+    ras_only <- cohort$expr[, cohort$true_class == "Ras-like"]
+    expect_true(ncol(ras_only) >= 25)
+    expect_warning(predict(fit, ras_only), "RAS side")
 })

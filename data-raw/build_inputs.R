@@ -1,5 +1,5 @@
-## Assisted-by: Claude Opus 5 (Anthropic). See the Provenance section
-## of README.md.
+## Assisted-by: Claude Opus 5 and Claude Fable 5.1 (Anthropic). See the
+## Provenance section of README.md.
 ##
 ## Builds every expression matrix the other data-raw scripts consume. They
 ## used to take pre-made .rds files whose construction lived only in shell
@@ -63,7 +63,10 @@
 ##    signature.
 ##
 ## 6. GSE33630. Built from the CEL files with RMA and collapsed to symbols by
-##    the highest-variance probe set. The matrix used before came from
+##    the highest-variance probe set, variance taken over all 105 arrays
+##    (tumors, anaplastic carcinomas and normals alike) before the diagnosis
+##    split, so one probe set represents a gene in every group. The matrix
+##    used before came from
 ##    elsewhere and had lost ITGA3 and RASGEF1B to a filter nobody here
 ##    controlled; building from the CELs restores them, so the microarray
 ##    figures move slightly. That is the correct direction.
@@ -111,10 +114,8 @@ read_gdc <- function(dir) {
         data.type = "Gene Expression Quantification",
         workflow.type = "STAR - Counts"
     )
-    withr_dir <- getwd()
-    on.exit(setwd(withr_dir), add = TRUE)
-    setwd(dirname(normalizePath(dir)))
-    TCGAbiolinks::GDCprepare(query, summarizedExperiment = FALSE)
+    TCGAbiolinks::GDCprepare(query, directory = normalizePath(dir),
+                             summarizedExperiment = FALSE)
 }
 
 ## Sum the rows that share a gene symbol. Applied to counts and to TPM alike

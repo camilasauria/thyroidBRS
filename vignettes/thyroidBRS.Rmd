@@ -15,11 +15,7 @@ vignette: >
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 ```
 
-```{r setup}
-library(thyroidBRS)
-```
-
-## Background
+## Introduction
 
 Papillary thyroid carcinoma (PTC) is predominantly driven by either a
 `BRAF`^V600E^ mutation or a RAS-family mutation. Agrawal et al. (2014)
@@ -42,6 +38,23 @@ sample with expression data can be scored against the same centroids.
 2. **`predict()`** — scores *any* sample against those centroids, including
    samples that were never labeled.
 
+## Installation
+
+`thyroidBRS` is installed from Bioconductor with `BiocManager`:
+
+```{r install, eval = FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
+    install.packages("BiocManager")
+}
+BiocManager::install("thyroidBRS")
+```
+
+Then load it:
+
+```{r setup}
+library(thyroidBRS)
+```
+
 ## How the score is defined
 
 Extended Experimental Procedures 14.1 defines the score of a tumor `t` as the
@@ -54,7 +67,7 @@ where `v(t)` is the sample's expression across the signature, z-scored
 gene-by-gene against the reference cohort, and each norm is divided by the
 square root of the number of signature genes, so the score does not depend on
 how many of them survived. Negative scores are BRAF^V600E^-like, positive
-ones RAS-like.
+ones RAS-like; `brs_class` spells the two `"Braf-like"` and `"Ras-like"`.
 
 `predict()` returns two flavours of the same quantity:
 
@@ -82,8 +95,8 @@ re-fits the centroids in each fold, but the signature does not move: those 71
 genes were selected on these same TCGA tumors, so gene selection sits outside
 the loop and 99.7% is an upper bound. The 96.4% is the cleanest figure, since
 those tumors carry other drivers and entered neither the signature derivation
-nor the fit. Both still measure agreement with the original classifier, not
-with a biological truth.
+nor the fit. The 96.4% still measures agreement with the original classifier,
+not with a biological truth.
 
 Expression pipelines have moved since 2014 (RSEM on hg19 then, STAR on
 GENCODE v36 now) and that difference is not reconstructable, so the scores
@@ -123,22 +136,25 @@ real data.
 ```{r simulate-data}
 set.seed(1)
 genes <- na.omit(brs_genes$current_symbol)
-samples <- paste0("sample_", 1:60)
+samples <- paste0("sample_", seq_len(60))
 
 # Two groups with a real difference across the signature, so the example
-# shows the classifier doing something rather than fitting noise.
+# shows the classifier doing something rather than fitting noise. The 24
+# samples without a label are a mix of both kinds, as a real cohort is.
 group <- rep(c("BRAF_V600E", "RAS", "unknown"), c(24, 12, 24))
-shift <- ifelse(brs_genes$up_in[!is.na(brs_genes$current_symbol)] == "RAS",
-                1, -1)
+up_in_ras <- brs_genes$up_in[!is.na(brs_genes$current_symbol)] == "RAS"
+shift <- ifelse(up_in_ras, 1, -1)
+side <- ifelse(group == "BRAF_V600E", -0.5, 0.5)
+side[group == "unknown"] <- rep(c(-0.5, 0.5), length.out = 24)
 
 expr <- matrix(rnorm(length(genes) * length(samples)),
                nrow = length(genes), dimnames = list(genes, samples))
-expr <- expr + outer(shift, ifelse(group == "BRAF_V600E", -0.5, 0.5))
+expr <- expr + outer(shift, side)
 
 # Mutation labels for the 36 samples that have exome data...
-labels <- setNames(group[1:36], samples[1:36])
+labels <- setNames(group[seq_len(36)], samples[seq_len(36)])
 # ...and 24 with expression only.
-unlabeled <- samples[37:60]
+unlabeled <- setdiff(samples, names(labels))
 ```
 
 ### Fit the reference centroids
@@ -178,15 +194,17 @@ For a real estimate, hold samples out:
 
 ```{r crossval}
 set.seed(2)
-fold <- sample(rep(1:4, length.out = length(labels)))
-cv <- character(length(labels))
-names(cv) <- names(labels)
+n_folds <- 4
+fold <- sample(rep(seq_len(n_folds), length.out = length(labels)))
 
-for (k in 1:4) {
-  f <- brs_fit(expr, labels[fold != k])
-  held <- names(labels)[fold == k]
-  cv[held] <- predict(f, expr[, held, drop = FALSE])$brs_class
+# Fit on all folds but one, score the held-out fold, and name each call by
+# its sample.
+cv_fold <- function(k) {
+    f <- brs_fit(expr, labels[fold != k])
+    held <- names(labels)[fold == k]
+    setNames(predict(f, expr[, held, drop = FALSE])$brs_class, held)
 }
+cv <- unlist(lapply(seq_len(n_folds), cv_fold))[names(labels)]
 
 truth <- ifelse(labels == "BRAF_V600E", "Braf-like", "Ras-like")
 mean(cv == truth)
@@ -206,17 +224,31 @@ head(all_preds)
 
 `brs_fit()`, `predict()` and `brs_score()` also take a
 `SummarizedExperiment` or an `ExpressionSet`, so data from `TCGAbiolinks`
-or `GEOquery` goes in without unwrapping:
+or `GEOquery` goes in without unwrapping. With the simulated cohort from
+above:
 
-```r
-se <- GDCprepare(q)                      # several assays
+```{r containers, message = FALSE}
+library(SummarizedExperiment)
 
-# colData() has to carry driver-mutation status. Whatever you name here, it
-# must not be the published BRAF-like/RAS-like class: that is the output of
-# this same classifier, and fitting on it is circular.
-colData(se)$driver <- mutation_status[colnames(se)]
-fit <- brs_fit(se, "driver", assay = "tpm_unstranded", log2_transform = TRUE)
+# colData() has to carry driver-mutation status. Whatever you name the
+# column, it must not be the published BRAF-like/RAS-like class: that is
+# the output of this same classifier, and fitting on it is circular.
+# Samples without exome data get NA and are simply not used for the fit.
+se <- SummarizedExperiment(
+    assays = list(logexpr = expr),
+    colData = DataFrame(driver = replace(group, group == "unknown", NA),
+                        row.names = samples)
+)
+
+fit_se <- brs_fit(se, "driver", assay = "logexpr")
+identical(fit_se, fit)
+head(predict(fit_se, se, assay = "logexpr"))
 ```
+
+On a GDC object the calls are the same, with the assay named in both and
+the transform requested:
+`brs_fit(se, "driver", assay = "tpm_unstranded", log2_transform = TRUE)`,
+then `predict(fit, se, assay = "tpm_unstranded")`.
 
 Two things to watch. Pick the assay explicitly — the first assay of a GDC
 object is raw counts, which is not what you want, and `brs_fit()` warns if
@@ -252,23 +284,25 @@ So:
 Re-standardizing against the new cohort instead is tempting and does fix the
 cross-platform threshold, but it buys that by making every sample's score
 depend on the company it keeps: applied to a cohort that happens to be all
-RAS-like, it gets 8% of them right. That is why it is not the default.
+RAS-like, it gets 8.4% of them right. That is why it is not the default.
 
 ## Using real TCGA data
 
 `data-raw/validate_tcga.R` runs the full reproduction. It lives in the
 [package repository](https://github.com/camilasauria/thyroidBRS), not in the
-installed package.
-The shape of it:
+installed package. The shape of it is below; the chunk is not evaluated
+because it downloads the whole TCGA-THCA expression set from GDC:
 
-```r
+```{r tcga, eval = FALSE}
 library(TCGAbiolinks)
 
 # 1. A log2(TPM + 1) matrix of primary tumors, gene symbols x patient barcode.
-q <- GDCquery(project = "TCGA-THCA",
-              data.category = "Transcriptome Profiling",
-              data.type = "Gene Expression Quantification",
-              workflow.type = "STAR - Counts")
+q <- GDCquery(
+    project = "TCGA-THCA",
+    data.category = "Transcriptome Profiling",
+    data.type = "Gene Expression Quantification",
+    workflow.type = "STAR - Counts"
+)
 GDCdownload(q)
 se <- GDCprepare(q)
 # keep assay "tpm_unstranded", primary tumors (-01), collapse duplicated
@@ -288,6 +322,13 @@ preds <- predict(fit, expr)
 published <- setNames(ref$published_class, ref$patient)
 validate_brs(preds, published[!is.na(published)], fit = fit)
 ```
+
+`thca_reference.csv` has one row per primary tumor of the study (496):
+`sample` (aliquot barcode), `patient`, `driver_group` (`BRAF_V600E`, `RAS` or
+`OTHER`), `has_exome`, `published_brs` and `published_class`. `OTHER` covers
+both tumors with another driver and the 94 that were never exome sequenced;
+`has_exome` tells them apart. For the fit this does not matter, since `OTHER`
+is simply "unlabeled", but it does if you use the table for anything else.
 
 Doing this today scores 505 primary tumors — 114 more than the
 published 391 — and agrees with the published score at Spearman 0.941,

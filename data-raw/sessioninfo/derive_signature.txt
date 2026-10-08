@@ -1,9 +1,11 @@
-script: portability
-run on: 2026-10-08 00:30:08 CST
+script: derive_signature
+run on: 2026-10-08 00:34:04 CST
 commit: a73fefd
 thyroidBRS: 0.99.6
-THCA_LOG2TPM=thca_log2tpm.rds
-GSE33630=gse33630.rds
+THCA_COUNTS=derive_input.rds
+BRS_CORES=15
+BRS_UNIVERSE=coding
+BRS_OUT=derive_coding.rds
 
 R version 4.5.2 (2025-10-31)
 Platform: x86_64-conda-linux-gnu
@@ -22,20 +24,22 @@ time zone: America/Mexico_City
 tzcode source: system (glibc)
 
 attached base packages:
-[1] stats     graphics  grDevices utils     datasets  methods   base     
+[1] parallel  stats     graphics  grDevices utils     datasets  methods  
+[8] base     
 
 other attached packages:
-[1] thyroidBRS_0.99.6
+[1] thyroidBRS_0.99.6 edgeR_4.8.2       limma_3.66.0     
 
 loaded via a namespace (and not attached):
  [1] SparseArray_1.10.9          Matrix_1.7-4               
  [3] lattice_0.22-9              MatrixGenerics_1.22.0      
  [5] matrixStats_1.5.0           abind_1.4-8                
  [7] S4Arrays_1.10.1             XVector_0.50.0             
- [9] BiocGenerics_0.56.0         Biobase_2.70.0             
+ [9] Biobase_2.70.0              BiocGenerics_0.56.0        
 [11] generics_0.1.4              stats4_4.5.2               
 [13] Seqinfo_1.0.0               GenomicRanges_1.62.1       
 [15] IRanges_2.44.0              grid_4.5.2                 
-[17] DelayedArray_0.36.0         compiler_4.5.2             
-[19] tools_4.5.2                 S4Vectors_0.48.0           
-[21] SummarizedExperiment_1.40.0
+[17] DelayedArray_0.36.0         statmod_1.5.1              
+[19] compiler_4.5.2              tools_4.5.2                
+[21] locfit_1.5-9.12             S4Vectors_0.48.0           
+[23] SummarizedExperiment_1.40.0

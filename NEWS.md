@@ -1,3 +1,67 @@
+# thyroidBRS 0.99.6
+
+Changes from the Bioconductor review and a pass over the submission
+guidelines. Nothing here changes a score.
+
+* The vignette has an Installation section near the top, with the
+  `BiocManager` instructions in an unevaluated chunk.
+* No `for` loops remain in the repository. The cross-validation in the
+  vignette and the block-ordering check in the tests use `lapply()`; the
+  `data-raw/` scripts use `lapply()` and `vapply()`. Every script was run
+  in both forms against the same inputs, and its output is unchanged.
+* The vignette's `SummarizedExperiment` example is now an evaluated chunk,
+  its "Background" section is titled "Introduction", and the unevaluated
+  TCGA chunk says why it is not run.
+* `print()` for `brs_fit` objects is documented on `?brs_fit`.
+
+A review of the whole package against what a Bioconductor reviewer looks at
+found no error in the score, and the following, all fixed:
+
+* `brs_score()` warned that `assay` was ignored whenever one of `expr` and
+  `newdata` was a `SummarizedExperiment` and the other a matrix, although
+  `assay` had been used for the container. It now goes only to the side
+  that is a `SummarizedExperiment`.
+* `predict()` with `standardize = "rank"` and a single signature gene
+  crashed inside `dimnames<-`; it now reaches the ordinary "no signature
+  gene varies" error.
+* Duplicated rows were only detected under the spelling the fit used, so a
+  matrix carrying `ARNTL` twice scored silently against a fit that knew the
+  gene as `BMAL1`. Both spellings are checked.
+* `log2_transform = TRUE` on a matrix with negative values is an error
+  instead of a warning followed by a cascade of `NaN` warnings.
+* `predict.brs_fit()` checks that `object` is a `brs_fit`. An `assay` that
+  is not a single name or index, or a numeric index out of range, is a
+  package error rather than a subscript error from `SummarizedExperiment`.
+* Documentation: `brs_score()` accepts containers for `newdata`; each
+  reference group needs two samples; `brs_class` is `NA` for a sample with a
+  missing value; `"rank"` ranks within the signature, not the transcriptome;
+  the TCGA section of the vignette describes the columns of
+  `thca_reference.csv`.
+* The vignette's unlabeled samples are a mix of both kinds, so the chunk
+  that scores them shows both classes; one sentence wrongly said that the
+  99.7% cross-validation measures agreement with the original classifier.
+* `inst/CITATION` gives the TCGA Research Network as a single `person`, so
+  text and BibTeX renderings no longer split the name.
+* The README's Provenance section names the three models that wrote parts
+  of the package and no longer quotes line and commit counts that had gone
+  stale; its references to `data-raw/` are links to the repository.
+* Fourteen tests cover branches that had none: `ExpressionSet` with
+  `labels` as a `pData()` column, the dropped-gene listing of `print()`,
+  `validate_brs()` with unscored samples, input checks, one-signed
+  `brs_scaled`, and the fixes above.
+* `data-raw/`: the three within/between-block correlations quoted for
+  GSE33630 were left over from an earlier matrix and nothing computed
+  them; `portability.R` now prints them and the notes carry the recomputed
+  values. `derive_signature.R` prints the consistency figures the notes
+  quote (with the definition of the median stated), and stops if a worker
+  fails. `record_session()` records the inputs, knobs and commit of each
+  run. `validate_tcga.R` sends readers to `build_inputs.R` for the matrix
+  instead of a recipe that could produce a different one; `build_inputs.R`
+  passes the GDC directory to `GDCprepare()` instead of relying on its
+  name. The median selection frequency quoted in the README and the notes
+  is 93-97% (93.5% and 97.2%), computed over the 70 usable published genes;
+  the earlier 92-97% had counted a gene absent from every annotation.
+
 # thyroidBRS 0.99.5
 
 Changes from a review of the package against what a Bioconductor reviewer

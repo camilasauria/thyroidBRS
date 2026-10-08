@@ -2,7 +2,7 @@
 # (Anthropic) working from the published description of the method, under the
 # direction of and reviewed by the package authors, who are responsible for
 # its correctness and maintenance. See the Provenance section of README.md.
-# Assisted-by: Claude Opus 5 (Anthropic)
+# Assisted-by: Claude Opus 5 and Claude Fable 5.1 (Anthropic)
 
 #' Fit BRAF-RAS Score (BRS) reference centroids
 #'
@@ -48,7 +48,8 @@
 #'   from `labels` are treated as unlabeled and excluded from centroid
 #'   fitting, but can still be scored with [predict.brs_fit()]. An
 #'   unrecognised value warns: a mis-specified label column otherwise looks
-#'   exactly like a cohort that has unlabeled samples.
+#'   exactly like a cohort that has unlabeled samples. Each reference group
+#'   needs at least two samples; fewer is an error.
 #' @param genes Character vector of gene symbols to use as the signature.
 #'   Defaults to the alias-resolved names in [brs_genes] (70 genes; `FLJ23867`
 #'   has no current symbol and is excluded).
@@ -294,8 +295,9 @@ brs_fit <- function(expr, labels, genes = NULL, log2_transform = FALSE,
 #' @param standardize How to put `newdata` on the scale the centroids live
 #'   on. `"reference"` (the default) uses the per-gene mean and SD frozen from
 #'   the fit. `"cohort"` re-derives them from `newdata` itself, and `"rank"`
-#'   replaces each sample's expression by within-sample ranks first. The last
-#'   two need at least 3 samples. See the section below before changing it.
+#'   replaces each sample's expression by its rank among the signature genes
+#'   (not the whole transcriptome) before standardizing. The last two need at
+#'   least 3 samples. See the section below before changing it.
 #' @param assay Assay to use when `newdata` is a `SummarizedExperiment`; see
 #'   [brs_fit()].
 #' @param ... Not used. Present for S3 consistency with [stats::predict()];
@@ -306,7 +308,9 @@ brs_fit <- function(expr, labels, genes = NULL, log2_transform = FALSE,
 #'   `sample`, `brs_score` (normalized distance difference; negative = more
 #'   BRAF-like, positive = more RAS-like), `brs_scaled` (the same score
 #'   rescaled to \eqn{[-1, +1]} across the scored samples, `NA` when it cannot
-#'   be determined) and `brs_class` (`"Braf-like"` or `"Ras-like"`).
+#'   be determined) and `brs_class` (`"Braf-like"` or `"Ras-like"`). A sample
+#'   with a missing value in a signature gene gets `NA` in all three, with a
+#'   warning.
 #'
 #' @examples
 #' set.seed(1)
@@ -333,6 +337,7 @@ brs_fit <- function(expr, labels, genes = NULL, log2_transform = FALSE,
 predict.brs_fit <- function(object, newdata, log2_transform = NULL,
                             standardize = c("reference", "cohort", "rank"),
                             assay = NULL, ...) {
+    .check_fit_object(object)
     standardize <- match.arg(standardize)
     .warn_unused_dots(...names(), ...length())
     newdata <- .as_expr_matrix(newdata, assay, "newdata")
@@ -340,7 +345,10 @@ predict.brs_fit <- function(object, newdata, log2_transform = NULL,
 
     do_log2 <- .resolve_scale(object, log2_transform)
 
-    newdata <- .drop_duplicate_rows(newdata, object$genes_used)
+    # Look for duplicates under either spelling of each gene: a matrix with
+    # ARNTL twice must warn even when the fit knows the gene as BMAL1.
+    newdata <- .drop_duplicate_rows(newdata,
+                                    .both_spellings(object$genes_used))
     newdata <- .match_alias_rows(newdata, object$genes_used)
 
     .check_newdata_genes(rownames(newdata), object$genes_used)
@@ -383,9 +391,11 @@ predict.brs_fit <- function(object, newdata, log2_transform = NULL,
 #' partially-labeled cohort to full coverage).
 #'
 #' @inheritParams brs_fit
-#' @param newdata Expression matrix to score. Defaults to `expr` itself, so
+#' @param newdata Expression to score: a matrix, a `SummarizedExperiment` or
+#'   an `ExpressionSet`, as for `expr`. Defaults to `expr` itself, so
 #'   `brs_score(expr, labels)` scores every sample in `expr`, including the
-#'   ones without a label.
+#'   ones without a label. `assay` applies to whichever of `expr` and
+#'   `newdata` is a `SummarizedExperiment` (to both, when both are).
 #' @param standardize Passed to [predict.brs_fit()].
 #'
 #' @return See [predict.brs_fit()].
@@ -415,11 +425,17 @@ brs_score <- function(expr, labels, newdata = expr, genes = NULL,
                       log2_transform = FALSE,
                       standardize = c("reference", "cohort", "rank"),
                       assay = NULL) {
+    # `assay` applies to whichever of `expr` and `newdata` is a
+    # SummarizedExperiment; handing it to the other side would only earn a
+    # warning that it was ignored, when it was in fact used.
+    for_se <- function(x) if (methods::is(x, "SummarizedExperiment")) assay
     fit <- brs_fit(expr, labels,
         genes = genes,
-        log2_transform = log2_transform, assay = assay
+        log2_transform = log2_transform, assay = for_se(expr)
     )
-    predict(fit, newdata, standardize = match.arg(standardize), assay = assay)
+    predict(fit, newdata,
+        standardize = match.arg(standardize), assay = for_se(newdata)
+    )
 }
 
 #' Check BRS predictions against known labels
@@ -520,6 +536,9 @@ validate_brs <- function(predictions, labels, fit = NULL) {
     )
 }
 
+#' @param x A `brs_fit` object, for `print()`.
+#' @param ... Ignored; present for consistency with [base::print()].
+#' @rdname brs_fit
 #' @export
 print.brs_fit <- function(x, ...) {
     cat("<brs_fit>\n")
@@ -567,11 +586,10 @@ print.brs_fit <- function(x, ...) {
     }
 
     if (how == "rank") {
-        rn <- rownames(m)
-        cn <- colnames(m)
-        m <- apply(m, 2L, function(x) rank(x, na.last = "keep") /
-                       sum(!is.na(x)))
-        dimnames(m) <- list(rn, cn)
+        ranks <- apply(m, 2L, function(x) rank(x, na.last = "keep") /
+                           sum(!is.na(x)))
+        # apply() returns a bare vector when there is a single gene.
+        m <- matrix(ranks, nrow = nrow(m), dimnames = dimnames(m))
     }
 
     mu <- rowMeans(m, na.rm = TRUE)
@@ -708,6 +726,16 @@ print.brs_fit <- function(x, ...) {
     mat
 }
 
+.check_fit_object <- function(object) {
+    if (!inherits(object, "brs_fit")) {
+        stop("`object` must be a \"brs_fit\" object, as returned by ",
+            "brs_fit().",
+            call. = FALSE
+        )
+    }
+    invisible(TRUE)
+}
+
 .check_flag <- function(x, name) {
     if (!is.logical(x) || length(x) != 1L || is.na(x)) {
         stop("`", name, "` must be TRUE or FALSE.", call. = FALSE)
@@ -716,11 +744,14 @@ print.brs_fit <- function(x, ...) {
 }
 
 .log2p1 <- function(x) {
+    # Counts and TPM are never negative; a matrix that is has almost
+    # certainly been log-transformed already, and log2(x + 1) of it would
+    # produce NaN below -1 and nonsense above.
     if (any(x < 0, na.rm = TRUE)) {
-        warning("`log2_transform = TRUE` but the matrix has negative values; ",
-            "it may already be on a log scale.",
-            call. = FALSE
-        )
+        stop("`log2_transform = TRUE` but the matrix has negative values, ",
+             "so it is probably already on a log scale. Pass ",
+             "`log2_transform = FALSE`, or supply untransformed values.",
+             call. = FALSE)
     }
     log2(x + 1)
 }
@@ -888,8 +919,21 @@ print.brs_fit <- function(x, ...) {
     unique(out[!is.na(out) & !is.na(brs_genes$current_symbol)])
 }
 
+# Both spellings of each signature gene, so duplicate detection and alias
+# matching look at the same set of row names.
+.both_spellings <- function(genes) {
+    partner <- c(
+        stats::setNames(brs_genes$original_symbol, brs_genes$current_symbol),
+        stats::setNames(brs_genes$current_symbol, brs_genes$original_symbol)
+    )
+    partner <- partner[!is.na(names(partner)) & !is.na(partner)]
+    unique(c(genes, unname(partner[intersect(genes, names(partner))])))
+}
+
 .drop_duplicate_rows <- function(mat, genes) {
     dup <- duplicated(rownames(mat))
+    # Nothing to do, and no copy of a 60,000-row matrix for nothing.
+    if (!any(dup)) return(mat)
     if (any(dup & rownames(mat) %in% genes)) {
         hit <- unique(rownames(mat)[dup & rownames(mat) %in% genes])
         warning("Duplicated row names for ", length(hit),
