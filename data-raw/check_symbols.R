@@ -3,8 +3,8 @@
 ##
 ##   Rscript data-raw/check_symbols.R
 
-## Assisted-by: Claude Opus 5 (Anthropic). See the Provenance section
-## of README.md.
+## Assisted-by: Claude Opus 5 and Claude Fable 5.1 (Anthropic). See the
+## Provenance section of README.md.
 
 library(org.Hs.eg.db)
 
@@ -15,8 +15,10 @@ approved <- AnnotationDbi::keys(org.Hs.eg.db, "SYMBOL")
 
 resolve <- function(symbol) {
     hit <- tryCatch(
-        AnnotationDbi::select(org.Hs.eg.db, keys = symbol, keytype = "ALIAS",
-                              columns = "SYMBOL"),
+        suppressMessages(
+            AnnotationDbi::select(org.Hs.eg.db, keys = symbol,
+                                  keytype = "ALIAS", columns = "SYMBOL")
+        ),
         error = function(e) NULL
     )
     if (is.null(hit)) return(NA_character_)

@@ -1,5 +1,8 @@
 script: check_symbols
-run on: 2026-10-07 22:33:18 CST
+run on: 2026-10-08 00:29:49 CST
+commit: a73fefd
+thyroidBRS: 0.99.6
+environment: (defaults)
 
 R version 4.5.2 (2025-10-31)
 Platform: x86_64-conda-linux-gnu

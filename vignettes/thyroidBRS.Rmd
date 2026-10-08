@@ -67,7 +67,7 @@ where `v(t)` is the sample's expression across the signature, z-scored
 gene-by-gene against the reference cohort, and each norm is divided by the
 square root of the number of signature genes, so the score does not depend on
 how many of them survived. Negative scores are BRAF^V600E^-like, positive
-ones RAS-like.
+ones RAS-like; `brs_class` spells the two `"Braf-like"` and `"Ras-like"`.
 
 `predict()` returns two flavours of the same quantity:
 
@@ -95,8 +95,8 @@ re-fits the centroids in each fold, but the signature does not move: those 71
 genes were selected on these same TCGA tumors, so gene selection sits outside
 the loop and 99.7% is an upper bound. The 96.4% is the cleanest figure, since
 those tumors carry other drivers and entered neither the signature derivation
-nor the fit. Both still measure agreement with the original classifier, not
-with a biological truth.
+nor the fit. The 96.4% still measures agreement with the original classifier,
+not with a biological truth.
 
 Expression pipelines have moved since 2014 (RSEM on hg19 then, STAR on
 GENCODE v36 now) and that difference is not reconstructable, so the scores
@@ -136,22 +136,25 @@ real data.
 ```{r simulate-data}
 set.seed(1)
 genes <- na.omit(brs_genes$current_symbol)
-samples <- paste0("sample_", 1:60)
+samples <- paste0("sample_", seq_len(60))
 
 # Two groups with a real difference across the signature, so the example
-# shows the classifier doing something rather than fitting noise.
+# shows the classifier doing something rather than fitting noise. The 24
+# samples without a label are a mix of both kinds, as a real cohort is.
 group <- rep(c("BRAF_V600E", "RAS", "unknown"), c(24, 12, 24))
-shift <- ifelse(brs_genes$up_in[!is.na(brs_genes$current_symbol)] == "RAS",
-                1, -1)
+up_in_ras <- brs_genes$up_in[!is.na(brs_genes$current_symbol)] == "RAS"
+shift <- ifelse(up_in_ras, 1, -1)
+side <- ifelse(group == "BRAF_V600E", -0.5, 0.5)
+side[group == "unknown"] <- rep(c(-0.5, 0.5), length.out = 24)
 
 expr <- matrix(rnorm(length(genes) * length(samples)),
                nrow = length(genes), dimnames = list(genes, samples))
-expr <- expr + outer(shift, ifelse(group == "BRAF_V600E", -0.5, 0.5))
+expr <- expr + outer(shift, side)
 
 # Mutation labels for the 36 samples that have exome data...
-labels <- setNames(group[1:36], samples[1:36])
+labels <- setNames(group[seq_len(36)], samples[seq_len(36)])
 # ...and 24 with expression only.
-unlabeled <- samples[37:60]
+unlabeled <- setdiff(samples, names(labels))
 ```
 
 ### Fit the reference centroids
@@ -281,7 +284,7 @@ So:
 Re-standardizing against the new cohort instead is tempting and does fix the
 cross-platform threshold, but it buys that by making every sample's score
 depend on the company it keeps: applied to a cohort that happens to be all
-RAS-like, it gets 8% of them right. That is why it is not the default.
+RAS-like, it gets 8.4% of them right. That is why it is not the default.
 
 ## Using real TCGA data
 
@@ -294,10 +297,12 @@ because it downloads the whole TCGA-THCA expression set from GDC:
 library(TCGAbiolinks)
 
 # 1. A log2(TPM + 1) matrix of primary tumors, gene symbols x patient barcode.
-q <- GDCquery(project = "TCGA-THCA",
-              data.category = "Transcriptome Profiling",
-              data.type = "Gene Expression Quantification",
-              workflow.type = "STAR - Counts")
+q <- GDCquery(
+    project = "TCGA-THCA",
+    data.category = "Transcriptome Profiling",
+    data.type = "Gene Expression Quantification",
+    workflow.type = "STAR - Counts"
+)
 GDCdownload(q)
 se <- GDCprepare(q)
 # keep assay "tpm_unstranded", primary tumors (-01), collapse duplicated
@@ -317,6 +322,13 @@ preds <- predict(fit, expr)
 published <- setNames(ref$published_class, ref$patient)
 validate_brs(preds, published[!is.na(published)], fit = fit)
 ```
+
+`thca_reference.csv` has one row per primary tumor of the study (496):
+`sample` (aliquot barcode), `patient`, `driver_group` (`BRAF_V600E`, `RAS` or
+`OTHER`), `has_exome`, `published_brs` and `published_class`. `OTHER` covers
+both tumors with another driver and the 94 that were never exome sequenced;
+`has_exome` tells them apart. For the fit this does not matter, since `OTHER`
+is simply "unlabeled", but it does if you use the table for anything else.
 
 Doing this today scores 505 primary tumors — 114 more than the
 published 391 — and agrees with the published score at Spearman 0.941,

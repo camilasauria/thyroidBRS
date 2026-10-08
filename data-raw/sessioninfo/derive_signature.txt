@@ -1,5 +1,11 @@
 script: derive_signature
-run on: 2026-10-07 22:52:01 CST
+run on: 2026-10-08 00:34:04 CST
+commit: a73fefd
+thyroidBRS: 0.99.6
+THCA_COUNTS=derive_input.rds
+BRS_CORES=15
+BRS_UNIVERSE=coding
+BRS_OUT=derive_coding.rds
 
 R version 4.5.2 (2025-10-31)
 Platform: x86_64-conda-linux-gnu

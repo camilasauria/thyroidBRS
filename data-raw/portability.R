@@ -15,8 +15,8 @@
 ##            matrix of the PTC samples, gene symbols x GSM id.
 ## Either may be omitted; the sections that need it are then skipped.
 
-## Assisted-by: Claude Opus 5 (Anthropic). See the Provenance section
-## of README.md.
+## Assisted-by: Claude Opus 5 and Claude Fable 5.1 (Anthropic). See the
+## Provenance section of README.md.
 
 library(thyroidBRS)
 
@@ -152,6 +152,18 @@ if (nzchar(expr_path) && file.exists(expr_path)) {
         message("   PC1 explains ", round(100 * var1, 1), "% of the signature")
         message("   genes loading with their block's sign: ",
                 sum(sign(ld) == ifelse(ras_rows, 1, -1)), " of ", length(ld))
+
+        ## Mean pairwise correlation inside and across the two Figure S7A
+        ## blocks (block 1 is the RAS-high one): the structure the signature
+        ## rests on, measured on the array alone.
+        cc <- stats::cor(t(arr))
+        diag(cc) <- NA
+        blk <- ifelse(ras_rows, 1L, 2L)
+        message(sprintf(paste0("   mean correlation: within block 1 %+.3f",
+                               " | within block 2 %+.3f | between %+.3f"),
+                        mean(cc[blk == 1, blk == 1], na.rm = TRUE),
+                        mean(cc[blk == 2, blk == 2], na.rm = TRUE),
+                        mean(cc[blk == 1, blk == 2])))
 
         lines <- vapply(c("reference", "cohort", "rank"), function(how) {
             p <- suppressWarnings(predict(array_fit, arr, standardize = how))

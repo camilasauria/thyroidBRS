@@ -30,8 +30,9 @@ scale, so overriding it is almost always a mistake and warns.}
 \item{standardize}{How to put \code{newdata} on the scale the centroids live
 on. \code{"reference"} (the default) uses the per-gene mean and SD frozen from
 the fit. \code{"cohort"} re-derives them from \code{newdata} itself, and \code{"rank"}
-replaces each sample's expression by within-sample ranks first. The last
-two need at least 3 samples. See the section below before changing it.}
+replaces each sample's expression by its rank among the signature genes
+(not the whole transcriptome) before standardizing. The last two need at
+least 3 samples. See the section below before changing it.}
 
 \item{assay}{Assay to use when \code{newdata} is a \code{SummarizedExperiment}; see
 \code{\link[=brs_fit]{brs_fit()}}.}
@@ -45,7 +46,9 @@ A data frame with one row per sample in \code{colnames(newdata)}:
 \code{sample}, \code{brs_score} (normalized distance difference; negative = more
 BRAF-like, positive = more RAS-like), \code{brs_scaled} (the same score
 rescaled to \eqn{[-1, +1]} across the scored samples, \code{NA} when it cannot
-be determined) and \code{brs_class} (\code{"Braf-like"} or \code{"Ras-like"}).
+be determined) and \code{brs_class} (\code{"Braf-like"} or \code{"Ras-like"}). A sample
+with a missing value in a signature gene gets \code{NA} in all three, with a
+warning.
 }
 \description{
 Computes the BRAF-RAS Score (BRS) and the resulting class for every sample

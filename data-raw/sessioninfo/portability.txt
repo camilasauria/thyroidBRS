@@ -1,5 +1,9 @@
 script: portability
-run on: 2026-10-07 22:45:12 CST
+run on: 2026-10-08 00:30:08 CST
+commit: a73fefd
+thyroidBRS: 0.99.6
+THCA_LOG2TPM=thca_log2tpm.rds
+GSE33630=gse33630.rds
 
 R version 4.5.2 (2025-10-31)
 Platform: x86_64-conda-linux-gnu

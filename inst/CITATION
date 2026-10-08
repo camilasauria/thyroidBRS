@@ -10,15 +10,15 @@ bibentry(
                  person("Daniel", "P\u00e9rez-Calixto"),
                  person("Hugo", "Tovar")),
     year     = "2026",
-    note     = paste("R package version",
-                     if (is.null(meta$Version)) "0.99.1" else meta$Version),
+    note     = if (is.null(meta$Version)) "R package" else
+                   paste("R package version", meta$Version),
     url      = "https://github.com/camilasauria/thyroidBRS"
 )
 
 bibentry(
     bibtype  = "Article",
     title    = "Integrated Genomic Characterization of Papillary Thyroid Carcinoma",
-    author   = "The Cancer Genome Atlas Research Network",
+    author   = person(given = "The Cancer Genome Atlas Research Network"),
     journal  = "Cell",
     year     = "2014",
     volume   = "159",

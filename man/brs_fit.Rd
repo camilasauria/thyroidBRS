@@ -31,7 +31,8 @@ group by \code{"RAS"}, \code{"RAS-like"}, \code{"RAS-mutant"}, \code{"KRAS"}, \c
 from \code{labels} are treated as unlabeled and excluded from centroid
 fitting, but can still be scored with \code{\link[=predict.brs_fit]{predict.brs_fit()}}. An
 unrecognised value warns: a mis-specified label column otherwise looks
-exactly like a cohort that has unlabeled samples.}
+exactly like a cohort that has unlabeled samples. Each reference group
+needs at least two samples; fewer is an error.}
 
 \item{genes}{Character vector of gene symbols to use as the signature.
 Defaults to the alias-resolved names in \link{brs_genes} (70 genes; \code{FLJ23867}

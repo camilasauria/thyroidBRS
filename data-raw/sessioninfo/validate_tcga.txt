@@ -1,5 +1,8 @@
 script: validate_tcga
-run on: 2026-10-07 22:43:53 CST
+run on: 2026-10-08 00:29:58 CST
+commit: a73fefd
+thyroidBRS: 0.99.6
+THCA_LOG2TPM=thca_log2tpm.rds
 
 R version 4.5.2 (2025-10-31)
 Platform: x86_64-conda-linux-gnu

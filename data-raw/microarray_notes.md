@@ -15,15 +15,16 @@ All 70 usable signature genes are present. Across the 49 papillary tumors:
 | --- | --- |
 | Variance of the signature explained by PC1 | 46.2% |
 | Genes whose PC1 loading sign matches their Figure S7A block | 68 / 70 |
-| Mean correlation within block 1 | +0.284 |
-| Mean correlation within block 2 | +0.451 |
-| Mean correlation between blocks | -0.336 |
+| Mean correlation within block 1 | +0.415 |
+| Mean correlation within block 2 | +0.419 |
+| Mean correlation between blocks | -0.383 |
 
-These figures come from the matrix `data-raw/build_inputs.R` builds from the
-CEL files. An earlier version of this page reported 67 of 70 genes, 44.9% and
-66 of 67 sign-matching, measured on a matrix inherited from another pipeline
-that had dropped `ITGA3` and `RASGEF1B` in a filtering step nobody here
-controlled. Rebuilding recovers them.
+Every figure in this table comes from the matrix `data-raw/build_inputs.R`
+builds from the CEL files, and is printed by `data-raw/portability.R`. An
+earlier version of this page was measured on a matrix inherited from another
+pipeline that had dropped `ITGA3` and `RASGEF1B` in a filtering step nobody
+here controlled; its figures differed slightly and the three correlations had
+not been recomputed when the rest were. Rebuilding recovers both genes.
 
 That rebuild surfaced something the inherited matrix had silently decided:
 the series holds **105 arrays, not 94** — 49 papillary carcinomas, 45 matched
