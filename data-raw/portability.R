@@ -82,7 +82,7 @@ if (nzchar(expr_path) && file.exists(expr_path)) {
         "skewed 90/10" = c(head(braf, 180), head(ras, 20)),
         "balanced 50/50" = c(head(braf, length(ras)), ras)
     )
-    for (nm in names(cohorts)) {
+    lines <- vapply(names(cohorts), function(nm) {
         cols <- cohorts[[nm]]
         acc <- vapply(c("reference", "cohort"), function(how) {
             cls <- suppressWarnings(
@@ -90,9 +90,10 @@ if (nzchar(expr_path) && file.exists(expr_path)) {
             )$brs_class
             100 * mean(cls == truth[cols])
         }, numeric(1))
-        message(sprintf("   %-16s n=%3d  reference %5.1f%%  cohort %5.1f%%",
-                        nm, length(cols), acc[1], acc[2]))
-    }
+        sprintf("   %-16s n=%3d  reference %5.1f%%  cohort %5.1f%%",
+                nm, length(cols), acc[1], acc[2])
+    }, character(1))
+    message(paste(lines, collapse = "\n"))
 
     ## ---- 4. Carrying the centroids to a microarray ---------------------
     array_path <- Sys.getenv("GSE33630")
@@ -152,14 +153,14 @@ if (nzchar(expr_path) && file.exists(expr_path)) {
         message("   genes loading with their block's sign: ",
                 sum(sign(ld) == ifelse(ras_rows, 1, -1)), " of ", length(ld))
 
-        for (how in c("reference", "cohort", "rank")) {
+        lines <- vapply(c("reference", "cohort", "rank"), function(how) {
             p <- suppressWarnings(predict(array_fit, arr, standardize = how))
-            message(sprintf(
-                "   %-10s spearman vs PC1 %.3f | %2d Braf / %2d Ras",
-                            how, cor(p$brs_score, pc, method = "spearman"),
-                            sum(p$brs_class == "Braf-like"),
-                            sum(p$brs_class == "Ras-like")))
-        }
+            sprintf("   %-10s spearman vs PC1 %.3f | %2d Braf / %2d Ras",
+                    how, cor(p$brs_score, pc, method = "spearman"),
+                    sum(p$brs_class == "Braf-like"),
+                    sum(p$brs_class == "Ras-like"))
+        }, character(1))
+        message(paste(lines, collapse = "\n"))
     } else {
         message("\n4. GSE33630 not set; skipping the microarray section")
     }

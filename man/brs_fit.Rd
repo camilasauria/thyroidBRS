@@ -2,9 +2,12 @@
 % Please edit documentation in R/brs.R
 \name{brs_fit}
 \alias{brs_fit}
+\alias{print.brs_fit}
 \title{Fit BRAF-RAS Score (BRS) reference centroids}
 \usage{
 brs_fit(expr, labels, genes = NULL, log2_transform = FALSE, assay = NULL)
+
+\method{print}{brs_fit}(x, ...)
 }
 \arguments{
 \item{expr}{Gene expression, features (genes) as rows and samples as
@@ -45,6 +48,10 @@ Default \code{FALSE}.}
 with a warning when there is more than one. For GDC data the first
 assay is raw counts, so use \code{assay = "tpm_unstranded"} with
 \code{log2_transform = TRUE}, or a normalized assay of your own.}
+
+\item{x}{A \code{brs_fit} object, for \code{print()}.}
+
+\item{...}{Ignored; present for consistency with \code{\link[base:print]{base::print()}}.}
 }
 \value{
 An object of class \code{"brs_fit"}, a list with:

@@ -520,6 +520,9 @@ validate_brs <- function(predictions, labels, fit = NULL) {
     )
 }
 
+#' @param x A `brs_fit` object, for `print()`.
+#' @param ... Ignored; present for consistency with [base::print()].
+#' @rdname brs_fit
 #' @export
 print.brs_fit <- function(x, ...) {
     cat("<brs_fit>\n")

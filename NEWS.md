@@ -1,3 +1,19 @@
+# thyroidBRS 0.99.6
+
+Changes from the Bioconductor review and a pass over the submission
+guidelines. Nothing here changes a score.
+
+* The vignette has an Installation section near the top, with the
+  `BiocManager` instructions in an unevaluated chunk.
+* No `for` loops remain in the repository. The cross-validation in the
+  vignette and the block-ordering check in the tests use `lapply()`; the
+  `data-raw/` scripts use `lapply()` and `vapply()`. Every script was run
+  in both forms against the same inputs, and its output is unchanged.
+* The vignette's `SummarizedExperiment` example is now an evaluated chunk,
+  its "Background" section is titled "Introduction", and the unevaluated
+  TCGA chunk says why it is not run.
+* `print()` for `brs_fit` objects is documented on `?brs_fit`.
+
 # thyroidBRS 0.99.5
 
 Changes from a review of the package against what a Bioconductor reviewer

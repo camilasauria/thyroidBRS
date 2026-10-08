@@ -99,10 +99,10 @@ run <- function(n_per_group, label) {
     always <- names(freq)[freq == 1]
     message("  genes in the top ", TOP_N, " at EVERY iteration: ",
             length(always))
-    for (cut in c(0.99, 0.95, 0.90, 0.75, 0.50)) {
-        message("  at >= ", 100 * cut, "% of iterations: ",
-                sum(freq >= cut))
-    }
+    cuts <- c(0.99, 0.95, 0.90, 0.75, 0.50)
+    message(paste0("  at >= ", 100 * cuts, "% of iterations: ",
+                   vapply(cuts, function(cut) sum(freq >= cut), integer(1)),
+                   collapse = "\n"))
     list(freq = freq, always = always, hits = hits)
 }
 
@@ -122,16 +122,17 @@ top_n_overlap <- function(freq, published, n = length(published)) {
 ## 10 draws than over 200. Show the whole curve.
 iteration_curve <- function(hits, published) {
     message("\n  iterations -> genes kept at 100% (of which published)")
-    for (k in c(5, 10, 20, 50, 100, length(hits))) {
-        if (k > length(hits)) next
+    ks <- c(5, 10, 20, 50, 100, length(hits))
+    ks <- ks[ks <= length(hits)]
+    lines <- vapply(ks, function(k) {
         tab <- table(unlist(hits[seq_len(k)]))
         kept <- names(tab)[tab == k]
-        message("    ", formatC(k, width = 4), " -> ",
-                formatC(length(kept), width = 4), "  (",
-                length(intersect(kept, published)), " published, ",
-                round(100 * length(intersect(kept, published)) /
-                      max(1, length(kept))), "% precision)")
-    }
+        n_pub <- length(intersect(kept, published))
+        paste0("    ", formatC(k, width = 4), " -> ",
+               formatC(length(kept), width = 4), "  (", n_pub, " published, ",
+               round(100 * n_pub / max(1, length(kept))), "% precision)")
+    }, character(1))
+    message(paste(lines, collapse = "\n"))
 }
 
 ## The published signature, spelled the way this matrix spells it.

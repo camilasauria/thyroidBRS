@@ -79,13 +79,12 @@ print(table(published = pub$published_class, predicted = preds[i, "brs_class"]))
 ## ---- cross-validate on the reference set ------------------------------
 set.seed(1)
 fold <- sample(rep(seq_len(10), length.out = length(mut)))
-cv <- character(length(mut))
-names(cv) <- names(mut)
-for (k in seq_len(10)) {
+cv_fold <- function(k) {
     f <- brs_fit(expr, mut[fold != k])
     in_fold <- names(mut)[fold == k]
-    cv[in_fold] <- predict(f, expr[, in_fold, drop = FALSE])$brs_class
+    setNames(predict(f, expr[, in_fold, drop = FALSE])$brs_class, in_fold)
 }
+cv <- unlist(lapply(seq_len(10), cv_fold))[names(mut)]
 truth <- ifelse(mut == "BRAF_V600E", "Braf-like", "Ras-like")
 cat("\n10-fold CV against mutation status (n = ", length(mut), "): ",
     round(100 * mean(cv == truth), 1), "%\n", sep = "")

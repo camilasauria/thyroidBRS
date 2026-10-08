@@ -15,11 +15,7 @@ vignette: >
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 ```
 
-```{r setup}
-library(thyroidBRS)
-```
-
-## Background
+## Introduction
 
 Papillary thyroid carcinoma (PTC) is predominantly driven by either a
 `BRAF`^V600E^ mutation or a RAS-family mutation. Agrawal et al. (2014)
@@ -41,6 +37,23 @@ sample with expression data can be scored against the same centroids.
    some samples, computes the two reference centroids.
 2. **`predict()`** — scores *any* sample against those centroids, including
    samples that were never labeled.
+
+## Installation
+
+`thyroidBRS` is installed from Bioconductor with `BiocManager`:
+
+```{r install, eval = FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
+    install.packages("BiocManager")
+}
+BiocManager::install("thyroidBRS")
+```
+
+Then load it:
+
+```{r setup}
+library(thyroidBRS)
+```
 
 ## How the score is defined
 
@@ -178,15 +191,17 @@ For a real estimate, hold samples out:
 
 ```{r crossval}
 set.seed(2)
-fold <- sample(rep(1:4, length.out = length(labels)))
-cv <- character(length(labels))
-names(cv) <- names(labels)
+n_folds <- 4
+fold <- sample(rep(seq_len(n_folds), length.out = length(labels)))
 
-for (k in 1:4) {
-  f <- brs_fit(expr, labels[fold != k])
-  held <- names(labels)[fold == k]
-  cv[held] <- predict(f, expr[, held, drop = FALSE])$brs_class
+# Fit on all folds but one, score the held-out fold, and name each call by
+# its sample.
+cv_fold <- function(k) {
+    f <- brs_fit(expr, labels[fold != k])
+    held <- names(labels)[fold == k]
+    setNames(predict(f, expr[, held, drop = FALSE])$brs_class, held)
 }
+cv <- unlist(lapply(seq_len(n_folds), cv_fold))[names(labels)]
 
 truth <- ifelse(labels == "BRAF_V600E", "Braf-like", "Ras-like")
 mean(cv == truth)
@@ -206,17 +221,31 @@ head(all_preds)
 
 `brs_fit()`, `predict()` and `brs_score()` also take a
 `SummarizedExperiment` or an `ExpressionSet`, so data from `TCGAbiolinks`
-or `GEOquery` goes in without unwrapping:
+or `GEOquery` goes in without unwrapping. With the simulated cohort from
+above:
 
-```r
-se <- GDCprepare(q)                      # several assays
+```{r containers, message = FALSE}
+library(SummarizedExperiment)
 
-# colData() has to carry driver-mutation status. Whatever you name here, it
-# must not be the published BRAF-like/RAS-like class: that is the output of
-# this same classifier, and fitting on it is circular.
-colData(se)$driver <- mutation_status[colnames(se)]
-fit <- brs_fit(se, "driver", assay = "tpm_unstranded", log2_transform = TRUE)
+# colData() has to carry driver-mutation status. Whatever you name the
+# column, it must not be the published BRAF-like/RAS-like class: that is
+# the output of this same classifier, and fitting on it is circular.
+# Samples without exome data get NA and are simply not used for the fit.
+se <- SummarizedExperiment(
+    assays = list(logexpr = expr),
+    colData = DataFrame(driver = replace(group, group == "unknown", NA),
+                        row.names = samples)
+)
+
+fit_se <- brs_fit(se, "driver", assay = "logexpr")
+identical(fit_se, fit)
+head(predict(fit_se, se, assay = "logexpr"))
 ```
+
+On a GDC object the calls are the same, with the assay named in both and
+the transform requested:
+`brs_fit(se, "driver", assay = "tpm_unstranded", log2_transform = TRUE)`,
+then `predict(fit, se, assay = "tpm_unstranded")`.
 
 Two things to watch. Pick the assay explicitly — the first assay of a GDC
 object is raw counts, which is not what you want, and `brs_fit()` warns if
@@ -258,10 +287,10 @@ RAS-like, it gets 8% of them right. That is why it is not the default.
 
 `data-raw/validate_tcga.R` runs the full reproduction. It lives in the
 [package repository](https://github.com/camilasauria/thyroidBRS), not in the
-installed package.
-The shape of it:
+installed package. The shape of it is below; the chunk is not evaluated
+because it downloads the whole TCGA-THCA expression set from GDC:
 
-```r
+```{r tcga, eval = FALSE}
 library(TCGAbiolinks)
 
 # 1. A log2(TPM + 1) matrix of primary tumors, gene symbols x patient barcode.

@@ -46,10 +46,8 @@ test_that("brs_genes records the two blocks of Figure S7A", {
     # transcription lost no gene and reordered none. Compared against a radix
     # sort, which orders in the C locale on every platform — is.unsorted()
     # would compare in whatever collation the session happens to run under.
-    for (b in c(1L, 2L)) {
-        sym <- brs_genes$original_symbol[brs_genes$block == b]
-        expect_identical(sym, sort(sym, method = "radix"))
-    }
+    by_block <- split(brs_genes$original_symbol, brs_genes$block)
+    expect_identical(by_block, lapply(by_block, sort, method = "radix"))
 })
 
 test_that("stale symbols are resolved, ARNTL included", {

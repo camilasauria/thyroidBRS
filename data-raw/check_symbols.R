@@ -31,7 +31,8 @@ stale <- with(brs_genes, current_symbol[!is.na(current_symbol) &
                                         !current_symbol %in% approved])
 if (length(stale)) {
     cat("current_symbol no longer approved:\n")
-    for (s in stale) cat(sprintf("  %-12s -> %s\n", s, resolve(s)))
+    cat(sprintf("  %-12s -> %s\n", stale,
+                vapply(stale, resolve, character(1))), sep = "")
 } else {
     cat("All current_symbol values are approved HGNC symbols.\n")
 }
@@ -39,11 +40,11 @@ if (length(stale)) {
 ## 2. Every original_symbol that is stale should have a mapping (or be known
 ##    to be unresolvable).
 cat("\nOriginal symbols that are not approved symbols today:\n")
-for (s in with(brs_genes, original_symbol[!original_symbol %in% approved])) {
-    shipped <- brs_genes$current_symbol[brs_genes$original_symbol == s]
-    cat(sprintf("  %-12s org.Hs.eg.db: %-10s  shipped: %s\n",
-                s, resolve(s), ifelse(is.na(shipped), "<NA>", shipped)))
-}
+old <- with(brs_genes, original_symbol[!original_symbol %in% approved])
+shipped <- brs_genes$current_symbol[match(old, brs_genes$original_symbol)]
+cat(sprintf("  %-12s org.Hs.eg.db: %-10s  shipped: %s\n",
+            old, vapply(old, resolve, character(1)),
+            ifelse(is.na(shipped), "<NA>", shipped)), sep = "")
 
 ## 3. Shape invariants.
 stopifnot(
