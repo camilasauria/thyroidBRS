@@ -1,3 +1,8 @@
+# thyroidBRS 0.99.7
+
+* Accepted into Bioconductor (devel) on 2026-10-09. The README now gives the
+  `BiocManager` installation from devel; nothing in the package changed.
+
 # thyroidBRS 0.99.6
 
 Changes from the Bioconductor review and a pass over the submission
