@@ -51,14 +51,18 @@ the cohort changes.
 
 ## Installation
 
-Once the package is part of a Bioconductor release:
+`thyroidBRS` was accepted into Bioconductor in October 2026 and is in the
+development branch (devel), which requires the current R:
 
 ```r
 # install.packages("BiocManager")
+BiocManager::install(version = "devel")
 BiocManager::install("thyroidBRS")
 ```
 
-Until then, or to track development:
+From the next Bioconductor release on, the release version installs with
+`BiocManager::install("thyroidBRS")` alone. To track the GitHub repository
+directly:
 
 ```r
 # install.packages("remotes")
