@@ -73,6 +73,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Zenodo takes the version of each GitHub release from .zenodo.json;
+      # without it, it falls back to the tag name ("v1.1.2"). Bump both.
+      - name: .zenodo.json version matches DESCRIPTION
+        run: |
+          desc <- unname(read.dcf("DESCRIPTION", fields = "Version")[1, 1])
+          zen <- sub('.*"version": *"([^"]*)".*', "\\1",
+                     paste(readLines(".zenodo.json"), collapse = ""))
+          if (!identical(desc, zen)) {
+              stop("DESCRIPTION has ", desc, " but .zenodo.json has ", zen)
+          }
+        shell: Rscript {0}
+
       - name: Install dependencies
         run: |
           d <- read.dcf("DESCRIPTION")
